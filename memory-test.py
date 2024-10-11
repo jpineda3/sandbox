@@ -2,6 +2,7 @@ import yaml
 from nebula import network
 import os
 import glob
+import re
 
 import pytest
 
@@ -48,16 +49,20 @@ def test_free_memory(board):
     clean_up()
 
     n = network(yamlfilename=configFile, board_name=board)
-    n.run_ssh_command(command="dmesg | grep sysid ; free")
+    n.run_ssh_command(command="dmesg | grep -iE 'sysid|mem' ; free")
     
     log = read_log(board)
 
+    sha = ''
     mem = {}
     swap = {}
     keys = ['total', 'used', 'free', 'shared', 'buff/cache', 'available']
     memory_type = ['Mem:', 'Swap:']
 
     for line in log:
+        if 'git' in line:
+            matches = re.findall(r'<(.*?)>', line)
+            sha =  ' '.join(matches)
         for memory in memory_type:
             tmp_dict = memory.lower()[:-1]
             if memory in line:
@@ -65,9 +70,8 @@ def test_free_memory(board):
                 for index, value in enumerate(values):
                     eval(tmp_dict)[keys[index]] = int(value)
 
-    
-    assert mem['free'] > 10000
-    assert swap['free'] > 10000
+    assert mem['free'] > 0.05 * mem['total']
+    assert swap['free'] > 0.05 * swap['total']
 
     clean_up(board)
 
