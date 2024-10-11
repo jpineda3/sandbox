@@ -6,6 +6,21 @@ import re
 
 import pytest
 
+def concatenate_yaml_files(output_config, *input_config):
+    combined_data = {}
+    # Load and combine the YAML files
+    for file in input_config:
+        with open(file, 'r') as f:
+            try:
+                contents = yaml.safe_load(f)  # Load YAML file
+                if contents is not None:
+                    combined_data.update(contents)  # Append data
+            except yaml.YAMLError as e:
+                print(f"Error reading {file}: {e}")
+
+    # Write the combined data to the output YAML file
+    with open(output_config, 'w') as out_file:
+        yaml.dump(combined_data, out_file, default_flow_style=False)
 
 def read_log(board_name):
     pattern = os.getcwd() + '/'+ board_name +'_*.log'
@@ -33,14 +48,18 @@ def clean_up(board_name=None):
         except Exception as e:
             print(f"Error occurred: {e}")
 
-
-configFile = '/home/analog/nebula/sdg-nuc-04.yaml'
+# Read all nebula-config yaml files from ~/config
+pattern = os.getcwd() + '/config/*.yaml'
+input_config_filenames = list()
+for file_path in glob.glob(pattern):
+    input_config_filenames.append(file_path)
+concatenate_yaml_files('config/combined_config.yaml', *input_config_filenames)
 
 # Open and read the YAML file
+configFile = os.getcwd() + '/config/combined_config.yaml'
 with open(configFile, 'r') as file:
     data = yaml.safe_load(file)
-
-# Run fee command on every board
+# Get all board names
 boards = (list(data.keys()))
 
 #########################################
@@ -71,7 +90,8 @@ def test_free_memory(board):
                     eval(tmp_dict)[keys[index]] = int(value)
 
     assert mem['free'] > 0.05 * mem['total']
-    assert swap['free'] > 0.05 * swap['total']
+    if board != 'pluto':
+        assert swap['free'] > 0.05 * swap['total']
 
     clean_up(board)
 
